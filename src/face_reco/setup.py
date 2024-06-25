@@ -20,6 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            "detect_face = face_reco.detect_face:main",
+            "tracker_face = face_reco.tracker_face:main",
         ],
     },
 )
