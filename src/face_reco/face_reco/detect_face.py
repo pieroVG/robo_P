@@ -9,11 +9,14 @@ import cv2
 class FaceDetector(Node):
     def __init__(self):
         super().__init__('detect_face')
-        self.image_sub = self.create_subscription(Image, '/image_in', self.callback, rclpy.qos.QoSPresetProfiles.SENSOR_DATA.value)
+        self.image_sub = self.create_subscription(Image, '/camera/image_raw/compressed', self.callback, rclpy.qos.QoSPresetProfiles.SENSOR_DATA.value)
         self.face_pub = self.create_publisher(Point, '/detected_face', 1)
         self.image_pub = self.create_publisher(Image, '/image_out', 1)
         self.bridge = CvBridge()
-        self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        
+        # Remplacer par le chemin absolu du fichier Haar Cascade
+        haarcascade_path = '/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml'
+        self.face_cascade = cv2.CascadeClassifier(haarcascade_path)
     
     def callback(self, data):
         frame = self.bridge.imgmsg_to_cv2(data, 'bgr8')
