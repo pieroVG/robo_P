@@ -1,57 +1,51 @@
-#!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import CompressedImage
 from geometry_msgs.msg import Point
 from cv_bridge import CvBridge
 import cv2
+import numpy as np
 
 class FaceDetector(Node):
     def __init__(self):
-        super().__init__('detect_face')
-        self.image_sub = self.create_subscription(Image, '/camera/image_raw/uncompressed', self.callback, rclpy.qos.QoSPresetProfiles.SENSOR_DATA.value)
-        self.face_pub = self.create_publisher(Point, '/detected_face', 1)
-        self.image_pub = self.create_publisher(Image, '/image_out', 1)
-        self.bridge = CvBridge()
+        super().__init__('face_detector')
+        self.image_sub = self.create_subscription(CompressedImage,'/image_raw/compressed',self.callback,rclpy.qos.QoSPresetProfiles.SENSOR_DATA.value)
         
-        # Remplacer par le chemin absolu du fichier Haar Cascade
+        self.face_pub = self.create_publisher(Point, '/detected_face', 10)
+        self.image_pub = self.create_publisher(CompressedImage, '/image_out/compressed', 10)
+        self.bridge = CvBridge()
+
         haarcascade_path = '/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml'
         self.face_cascade = cv2.CascadeClassifier(haarcascade_path)
-    
+
     def callback(self, data):
-        frame = self.bridge.imgmsg_to_cv2(data, 'bgr8')
+        np_arr = np.frombuffer(data.data, np.uint8)
+        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = self.face_cascade.detectMultiScale(gray, 1.05, 8, minSize=(120, 120))
         
         for (x, y, w, h) in faces:
-            self.get_logger().info('face')
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 5)
             self.publish_coordinates(x, y, w, h)
 
-        # Publish image_out
-        image_message = self.bridge.cv2_to_imgmsg(frame, encoding="bgr8")
-        self.image_pub.publish(image_message)
-        
+        # Convert in ROS message
+        compressed_image_msg = self.bridge.cv2_to_compressed_imgmsg(frame)
+        self.image_pub.publish(compressed_image_msg)
+
     def publish_coordinates(self, x, y, w, h):
         point = Point()
-        point.x = x + w / 2  # Coordinate x center 
-        point.y = y + h / 2  # Coordinate y center
-        point.z = 0.00 # Z not used
+        point.x = x + w / 2  
+        point.y = y + h / 2  
+        point.z = 0.00
         self.face_pub.publish(point)
-        self.get_logger().info(f"Published coordinates: x={point.x}, y={point.y}")
+        self.get_logger().info(f"Face coordinates: x={point.x}, y={point.y}")
 
 def main(args=None):
-    #Initialisation communication ROS
     rclpy.init(args=args)
-
     face_detector = FaceDetector()
     rclpy.spin(face_detector)
     face_detector.destroy_node()
-
-    #Continue le node
-    #rclpy.spin(node)
-
-    #Stop communication
     rclpy.shutdown()
 
 if __name__ == '__main__':

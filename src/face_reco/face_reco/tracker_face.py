@@ -8,20 +8,20 @@ class FaceTracker(Node):
         super().__init__('tracker_face')
         self.face_sub = self.create_subscription(Point, '/detected_face', self.face_callback, 1)
 
-        # Initialisation pigpio to controll servos
+        # Initialisation pigpio to control servos
         self.pi = pigpio.pi()
         self.servo_pin_tilt = 17  
         self.servo_pin_pan = 18   
 
-        # Initial configuration 
+        # Initial configuration
         self.tilt_angle = 90
         self.pan_angle = 90
         self.set_servo_angle(self.servo_pin_tilt, self.tilt_angle)
         self.set_servo_angle(self.servo_pin_pan, self.pan_angle)
 
         # Dimensions de l'image
-        self.image_width = 320
-        self.image_height = 240
+        self.image_width = 640
+        self.image_height = 480
 
     def face_callback(self, msg):
         # Coordonnées du centre du visage
@@ -65,9 +65,13 @@ class FaceTracker(Node):
 def main(args=None):
     rclpy.init(args=args)
     face_tracker = FaceTracker()
-    rclpy.spin(face_tracker)
-    face_tracker.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(face_tracker)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        face_tracker.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
