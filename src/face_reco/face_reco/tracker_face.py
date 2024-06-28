@@ -29,37 +29,32 @@ class FaceTracker(Node):
         self.last_update_time = time.time()
 
     def face_callback(self, msg):
-        current_time = time.time()
-        # Update only if 0.1 seconds have passed since the last update
-        if current_time - self.last_update_time > 0.1:
-            self.last_update_time = current_time
+        # Coordonnées du centre du visage
+        face_x = msg.x
+        face_y = msg.y
 
-            # Coordonnées du centre du visage
-            face_x = msg.x
-            face_y = msg.y
+        # Coordonnées du centre de l'image
+        image_center_x = self.image_width / 2
+        image_center_y = self.image_height / 2
 
-            # Coordonnées du centre de l'image
-            image_center_x = self.image_width / 2
-            image_center_y = self.image_height / 2
+        # Calcul de l'erreur de position
+        error_x = face_x - image_center_x
+        error_y = face_y - image_center_y
 
-            # Calcul de l'erreur de position
-            error_x = face_x - image_center_x
-            error_y = face_y - image_center_y
+        # Ajustement des angles des servo-moteurs
+        k_p = 0.05  # Coefficient proportionnel pour le contrôle PID
+        self.pan_angle -= k_p * error_x
+        self.tilt_angle += k_p * error_y
 
-            # Ajustement des angles des servo-moteurs
-            k_p = 0.05  # Coefficient proportionnel pour le contrôle PID
-            self.pan_angle -= k_p * error_x
-            self.tilt_angle -= k_p * error_y
+        # Contrainte des angles entre 0 et 180 degrés
+        self.pan_angle = max(0, min(180, self.pan_angle))
+        self.tilt_angle = max(0, min(180, self.tilt_angle))
 
-            # Contrainte des angles entre 0 et 180 degrés
-            self.pan_angle = max(0, min(180, self.pan_angle))
-            self.tilt_angle = max(0, min(180, self.tilt_angle))
+        # Mise à jour des angles des servo-moteurs
+        self.set_servo_angle(self.servo_pin_tilt, self.tilt_angle)
+        self.set_servo_angle(self.servo_pin_pan, self.pan_angle)
 
-            # Mise à jour des angles des servo-moteurs
-            self.set_servo_angle(self.servo_pin_tilt, self.tilt_angle)
-            self.set_servo_angle(self.servo_pin_pan, self.pan_angle)
-
-            self.get_logger().info(f"Pan angle: {self.pan_angle}, Tilt angle: {self.tilt_angle}")
+        self.get_logger().info(f"Pan angle: {self.pan_angle}, Tilt angle: {self.tilt_angle}")
 
     def set_servo_angle(self, servo, angle):
         pulsewidth = 500 + (angle * 2000 / 180)  # Convertir l'angle en largeur d'impulsion (500-2500 microsecondes)
