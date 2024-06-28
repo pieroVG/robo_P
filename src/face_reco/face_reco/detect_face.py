@@ -9,7 +9,7 @@ import cv2
 class FaceDetector(Node):
     def __init__(self):
         super().__init__('detect_face')
-        self.image_sub = self.create_subscription(Image, '/camera/image_raw/compressed', self.callback, rclpy.qos.QoSPresetProfiles.SENSOR_DATA.value)
+        self.image_sub = self.create_subscription(Image, '/camera/image_raw/uncompressed', self.callback, rclpy.qos.QoSPresetProfiles.SENSOR_DATA.value)
         self.face_pub = self.create_publisher(Point, '/detected_face', 1)
         self.image_pub = self.create_publisher(Image, '/image_out', 1)
         self.bridge = CvBridge()
@@ -24,6 +24,7 @@ class FaceDetector(Node):
         faces = self.face_cascade.detectMultiScale(gray, 1.05, 8, minSize=(120, 120))
         
         for (x, y, w, h) in faces:
+            self.get_logger().info('face')
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 5)
             self.publish_coordinates(x, y, w, h)
 
@@ -35,7 +36,7 @@ class FaceDetector(Node):
         point = Point()
         point.x = x + w / 2  # Coordinate x center 
         point.y = y + h / 2  # Coordinate y center
-        point.z = 0  # Z not used
+        point.z = 0.00 # Z not used
         self.face_pub.publish(point)
         self.get_logger().info(f"Published coordinates: x={point.x}, y={point.y}")
 
