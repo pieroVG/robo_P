@@ -2,6 +2,8 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Point
 import pigpio
+import time
+import subprocess
 
 class FaceTracker(Node):
     def __init__(self):
@@ -23,33 +25,41 @@ class FaceTracker(Node):
         self.image_width = 640
         self.image_height = 480
 
+        # Time of the last update
+        self.last_update_time = time.time()
+
     def face_callback(self, msg):
-        # Coordonnées du centre du visage
-        face_x = msg.x
-        face_y = msg.y
+        current_time = time.time()
+        # Update only if 0.1 seconds have passed since the last update
+        if current_time - self.last_update_time > 0.1:
+            self.last_update_time = current_time
 
-        # Coordonnées du centre de l'image
-        image_center_x = self.image_width / 2
-        image_center_y = self.image_height / 2
+            # Coordonnées du centre du visage
+            face_x = msg.x
+            face_y = msg.y
 
-        # Calcul de l'erreur de position
-        error_x = face_x - image_center_x
-        error_y = face_y - image_center_y
+            # Coordonnées du centre de l'image
+            image_center_x = self.image_width / 2
+            image_center_y = self.image_height / 2
 
-        # Ajustement des angles des servo-moteurs
-        k_p = 0.1  # Coefficient proportionnel pour le contrôle PID
-        self.pan_angle -= k_p * error_x
-        self.tilt_angle -= k_p * error_y
+            # Calcul de l'erreur de position
+            error_x = face_x - image_center_x
+            error_y = face_y - image_center_y
 
-        # Contrainte des angles entre 0 et 180 degrés
-        self.pan_angle = max(0, min(180, self.pan_angle))
-        self.tilt_angle = max(0, min(180, self.tilt_angle))
+            # Ajustement des angles des servo-moteurs
+            k_p = 0.05  # Coefficient proportionnel pour le contrôle PID
+            self.pan_angle -= k_p * error_x
+            self.tilt_angle -= k_p * error_y
 
-        # Mise à jour des angles des servo-moteurs
-        self.set_servo_angle(self.servo_pin_tilt, self.tilt_angle)
-        self.set_servo_angle(self.servo_pin_pan, self.pan_angle)
+            # Contrainte des angles entre 0 et 180 degrés
+            self.pan_angle = max(0, min(180, self.pan_angle))
+            self.tilt_angle = max(0, min(180, self.tilt_angle))
 
-        self.get_logger().info(f"Pan angle: {self.pan_angle}, Tilt angle: {self.tilt_angle}")
+            # Mise à jour des angles des servo-moteurs
+            self.set_servo_angle(self.servo_pin_tilt, self.tilt_angle)
+            self.set_servo_angle(self.servo_pin_pan, self.pan_angle)
+
+            self.get_logger().info(f"Pan angle: {self.pan_angle}, Tilt angle: {self.tilt_angle}")
 
     def set_servo_angle(self, servo, angle):
         pulsewidth = 500 + (angle * 2000 / 180)  # Convertir l'angle en largeur d'impulsion (500-2500 microsecondes)
@@ -64,6 +74,14 @@ class FaceTracker(Node):
 
 def main(args=None):
     rclpy.init(args=args)
+
+    # Lancer sudo pigpiod
+    try:
+        subprocess.run(['sudo', 'pigpiod'], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to start pigpiod: {e}")
+        return
+
     face_tracker = FaceTracker()
     try:
         rclpy.spin(face_tracker)
